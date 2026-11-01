@@ -1,6 +1,6 @@
 [*] AXI4-Lite register simulation
-[dumpfile] "C:/FPGA_Practice/zynq_lesson01/wave.vcd"
-[savefile] "C:/FPGA_Practice/zynq_lesson01/axi_lite.gtkw"
+[dumpfile] "wave.vcd"
+[savefile] "axi_lite.gtkw"
 [timestart] 0
 [size] 1500 1000
 *-9.000000 0 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
