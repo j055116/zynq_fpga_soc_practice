@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>axi_lite_regs — waveform explorer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10151d;
+      --panel: #18212c;
+      --panel-2: #202c39;
+      --line: #334354;
+      --text: #e6edf3;
+      --muted: #9eacba;
+      --accent: #56b6c2;
+      --control: #e5a84b;
+      --data: #68b7ee;
+      --status: #a78bfa;
+      --good: #70c68b;
+      --warn: #efbd67;
+      --bad: #f27b72;
+      font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); }
+    header {
+      padding: 18px 22px 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    h1 { margin: 0 0 3px; font-size: 20px; }
+    h2 { margin: 0 0 12px; font-size: 15px; }
+    p { margin: 7px 0; }
+    .subtle, .muted { color: var(--muted); }
+    .toolbar, .transport { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    button, select, input[type="number"], input[type="range"] {
+      color: var(--text);
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font: inherit;
+    }
+    button { cursor: pointer; }
+    button:hover, button:focus-visible { border-color: var(--accent); outline: none; }
+    button.primary { background: #174752; border-color: #26717b; }
+    button:disabled { opacity: .48; cursor: default; }
+    select { max-width: 290px; }
+    main { padding: 16px 20px 24px; display: grid; gap: 14px; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 14px; min-width: 0; }
+    .transport-panel { display: grid; gap: 12px; }
+    .transport { justify-content: space-between; }
+    .transport-left, .transport-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .readout { color: var(--accent); font-variant-numeric: tabular-nums; min-width: 180px; }
+    .timeline { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
+    input[type="range"] { width: 100%; padding: 0; accent-color: var(--accent); }
+    .layout { display: grid; grid-template-columns: minmax(240px, .75fr) minmax(380px, 1.35fr) minmax(270px, .9fr); gap: 14px; align-items: start; }
+    .group-list { display: grid; gap: 8px; }
+    .group {
+      width: 100%; text-align: left; padding: 10px 11px;
+      background: var(--panel-2); border-left: 4px solid var(--line);
+    }
+    .group strong { display: block; margin-bottom: 2px; }
+    .group small { display: block; color: var(--muted); }
+    .group[data-kind="control"] { border-left-color: var(--control); }
+    .group[data-kind="data"] { border-left-color: var(--data); }
+    .group[data-kind="status"] { border-left-color: var(--status); }
+    .group.active { outline: 1px solid var(--accent); background: #263846; }
+    .legend { margin-top: 12px; display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
+    .legend span::before { content: ""; display: inline-block; width: 15px; height: 3px; margin: 0 7px 3px 0; background: currentColor; }
+    .legend .legend-data { color: var(--data); }
+    .legend .legend-control { color: var(--control); }
+    .legend .legend-status { color: var(--status); }
+    .diagram-note { margin-top: 10px; color: var(--muted); font-size: 12px; }
+    .signal-toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
+    .signal-toolbar select { flex: 1; min-width: 0; }
+    .table-wrap { max-height: 390px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+    table { border-collapse: collapse; width: 100%; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+    th, td { padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { position: sticky; top: 0; background: var(--panel-2); color: var(--muted); font-family: "Segoe UI", system-ui, sans-serif; }
+    tr.changed td { background: #1d3b3e; }
+    tr.selected td:first-child { box-shadow: inset 3px 0 var(--accent); }
+    .value { color: var(--data); overflow-wrap: anywhere; }
+    .value.unknown { color: var(--warn); }
+    .value.highz { color: var(--status); }
+    .signal-name { color: var(--text); cursor: pointer; }
+    .signal-name:hover { color: var(--accent); text-decoration: underline; }
+    .rtl-panel { min-height: 230px; }
+    .rtl-title { color: var(--accent); font-family: ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+    .source-row { padding: 7px 0; border-top: 1px solid var(--line); }
+    .source-row:first-of-type { border-top: 0; }
+    .source-row a { color: var(--accent); }
+    code { color: #d7c78c; font-family: ui-monospace, Consolas, monospace; }
+    .status { padding: 8px 10px; border-radius: 6px; background: var(--panel-2); color: var(--muted); }
+    .status.error { color: var(--bad); border: 1px solid #7d3e3a; }
+    .status.ready { color: var(--good); }
+    .footnote { color: var(--muted); font-size: 12px; }
+    @media (max-width: 1050px) { .layout { grid-template-columns: minmax(220px, .8fr) minmax(340px, 1.2fr); } .rtl-panel { grid-column: 1 / -1; } }
+    @media (max-width: 700px) { header { align-items: flex-start; } main { padding: 10px; } .layout { grid-template-columns: 1fr; } .rtl-panel { grid-column: auto; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>axi_lite_regs — waveform explorer</h1>
+      <div class="subtle">Offline VCD player · static RTL context · no network requests</div>
+    </div>
+    <div class="toolbar">
+      <label for="trace-file">VCD trace</label>
+      <input id="trace-file" type="file" accept=".vcd,text/plain">
+    </div>
+  </header>
+  <main>
+    <section class="panel transport-panel" aria-label="Trace controls">
+      <div class="transport">
+        <div class="transport-left">
+          <button id="play" class="primary" disabled>Play</button>
+          <button id="prev" disabled>Previous edge</button>
+          <button id="next" disabled>Next edge</button>
+          <label for="speed">Speed</label>
+          <select id="speed" aria-label="Playback speed">
+            <option value="1000">0.25×</option>
+            <option value="500" selected>0.5×</option>
+            <option value="250">1×</option>
+            <option value="100">2.5×</option>
+          </select>
+        </div>
+        <div class="transport-right">
+          <label for="cycle-input">Jump to edge</label>
+          <input id="cycle-input" type="number" min="0" value="0" style="width: 85px" disabled>
+          <button id="jump" disabled>Go</button>
+          <label for="timestamp-input">Timestamp</label>
+          <input id="timestamp-input" type="number" min="0" step="1" value="0" style="width: 105px" disabled>
+          <button id="timestamp-jump" disabled>Seek</button>
+          <span id="readout" class="readout">Load wave.vcd to start</span>
+        </div>
+      </div>
+      <div class="timeline">
+        <span class="muted">0</span>
+        <input id="timeline" type="range" min="0" max="0" value="0" disabled aria-label="Clock edge timeline">
+        <span id="edge-count" class="muted">—</span>
+      </div>
+      <div id="trace-status" class="status">Choose the supplied <code>wave.vcd</code>. The selected clock is <code>tb_axi_lite_regs.dut.ACLK</code>, rising edge.</div>
+    </section>
+
+    <section class="layout">
+      <section class="panel">
+        <h2>Architecture context</h2>
+        <div class="group-list">
+          <button class="group active" data-group="FG01" data-kind="control">
+            <strong>FG01 · Channel readiness</strong>
+            <small>CA01–CA03 · AWREADY / WREADY / ARREADY</small>
+          </button>
+          <button class="group" data-group="FG02" data-kind="data">
+            <strong>FG02 · Write capture and update</strong>
+            <small>AB001 · AW/W buffers → byte write → CONTROL / DATA</small>
+          </button>
+          <button class="group" data-group="FG03" data-kind="status">
+            <strong>FG03 · Write response</strong>
+            <small>AB001 · BVALID / BRESP held until BREADY</small>
+          </button>
+          <button class="group" data-group="FG04" data-kind="data">
+            <strong>FG04 · Read decode and response</strong>
+            <small>AB001 · AR address → RDATA / RRESP / RVALID</small>
+          </button>
+          <button class="group" data-group="FG05" data-kind="control">
+            <strong>FG05 · Synchronous reset</strong>
+            <small>AB001 · active-low ARESETn sampled on ACLK</small>
+          </button>
+        </div>
+        <div class="legend">
+          <span class="legend-data">Solid/data context: payload or register values</span>
+          <span class="legend-control">Dashed/control context: handshakes, decode, reset</span>
+          <span class="legend-status">Status context: response and valid flags</span>
+        </div>
+        <p class="diagram-note">Groups describe responsibilities within AB001, not independent processes. Highlights show static RTL relationships; changed values do not prove which process executed.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Signals at selected edge</h2>
+        <div class="signal-toolbar">
+          <select id="signal-filter" aria-label="Signal filter" disabled>
+            <option value="all">All tracked signals</option>
+            <option value="group">Selected functional group</option>
+          </select>
+          <select id="clock-select" aria-label="Clock domain" disabled>
+            <option value="tb_axi_lite_regs.dut.ACLK">ACLK · posedge</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Signal</th><th>Value</th><th>RTL context</th></tr></thead>
+            <tbody id="signal-rows"><tr><td colspan="3" class="muted">Load a VCD trace to display signal snapshots.</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel rtl-panel">
+        <h2>RTL / process context</h2>
+        <div id="rtl-context">
+          <p>Click a signal or functional group to see its static RTL relationship and source anchor.</p>
+          <div class="source-row"><strong>AB001</strong> · <code>always @(posedge ACLK)</code></div>
+          <div class="source-row">DUT source: <a href="./axi_lite_regs.v#L26">axi_lite_regs.v:26–70</a></div>
+          <div class="source-row">Architecture notes: <a href="./axi_lite_regs_ARCHITECTURE.md">axi_lite_regs_ARCHITECTURE.md</a></div>
+        </div>
+      </section>
+    </section>
+    <p class="footnote">Snapshot policy: apply every VCD change through the selected timestamp and show the final value at that timestamp. VCD does not encode simulator scheduling regions here; “post-edge” means last recorded timestamp snapshot, not a claim about delta-cycle/NBA ordering. x and z remain visible as unknown/high-impedance values.</p>
+  </main>
+
+  <script>
+    "use strict";
+    const SIGNALS = [
+      { path: "tb_axi_lite_regs.clk", label: "clk", group: "FG01", block: "TB", source: "tb_axi_lite_regs.v:3", related: ["ACLK"] },
+      { path: "tb_axi_lite_regs.rstn", label: "rstn", group: "FG05", block: "TB", source: "tb_axi_lite_regs.v:4", related: ["ARESETn"] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_AWADDR", label: "S_AXI_AWADDR", group: "FG02", block: "AB001", source: "axi_lite_regs.v:35", related: ["awaddr_buf"] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_AWVALID", label: "S_AXI_AWVALID", group: "FG02", block: "AB001", source: "axi_lite_regs.v:34", related: ["S_AXI_AWREADY"] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_AWREADY", label: "S_AXI_AWREADY", group: "FG01", block: "CA01 / AB001", source: "axi_lite_regs.v:21, 34", related: ["aw_pending", "S_AXI_BVALID"] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_WDATA", label: "S_AXI_WDATA", group: "FG02", block: "AB001", source: "axi_lite_regs.v:39", related: ["wdata_buf"] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_WSTRB", label: "S_AXI_WSTRB", group: "FG02", block: "AB001", source: "axi_lite_regs.v:40", related: ["wstrb_buf"] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_WVALID", label: "S_AXI_WVALID", group: "FG02", block: "AB001", source: "axi_lite_regs.v:38", related: ["S_AXI_WREADY"] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_WREADY", label: "S_AXI_WREADY", group: "FG01", block: "CA02 / AB001", source: "axi_lite_regs.v:22, 38", related: ["w_pending", "S_AXI_BVALID"] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_BVALID", label: "S_AXI_BVALID", group: "FG03", block: "AB001", source: "axi_lite_regs.v:44, 56", related: ["S_AXI_BREADY"] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_BREADY", label: "S_AXI_BREADY", group: "FG03", block: "AB001", source: "axi_lite_regs.v:56", related: ["S_AXI_BVALID"] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_BRESP", label: "S_AXI_BRESP", group: "FG03", block: "AB001", source: "axi_lite_regs.v:45", related: [] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_ARADDR", label: "S_AXI_ARADDR", group: "FG04", block: "AB001", source: "axi_lite_regs.v:61", related: ["control_reg", "data_reg"] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_ARVALID", label: "S_AXI_ARVALID", group: "FG04", block: "AB001", source: "axi_lite_regs.v:58", related: ["S_AXI_ARREADY"] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_ARREADY", label: "S_AXI_ARREADY", group: "FG01", block: "CA03 / AB001", source: "axi_lite_regs.v:24, 58", related: ["S_AXI_RVALID"] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_RDATA", label: "S_AXI_RDATA", group: "FG04", block: "AB001", source: "axi_lite_regs.v:62–65", related: ["control_reg", "data_reg"] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_RRESP", label: "S_AXI_RRESP", group: "FG04", block: "AB001", source: "axi_lite_regs.v:60", related: [] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_RVALID", label: "S_AXI_RVALID", group: "FG04", block: "AB001", source: "axi_lite_regs.v:59, 68", related: ["S_AXI_RREADY"] },
+      { path: "tb_axi_lite_regs.dut.S_AXI_RREADY", label: "S_AXI_RREADY", group: "FG04", block: "AB001", source: "axi_lite_regs.v:68", related: ["S_AXI_RVALID"] },
+      { path: "tb_axi_lite_regs.dut.aw_pending", label: "aw_pending", group: "FG02", block: "AB001", source: "axi_lite_regs.v:36, 53", related: ["S_AXI_AWREADY"] },
+      { path: "tb_axi_lite_regs.dut.w_pending", label: "w_pending", group: "FG02", block: "AB001", source: "axi_lite_regs.v:41, 54", related: ["S_AXI_WREADY"] },
+      { path: "tb_axi_lite_regs.dut.awaddr_buf", label: "awaddr_buf", group: "FG02", block: "AB001", source: "axi_lite_regs.v:35, 46", related: ["S_AXI_AWADDR"] },
+      { path: "tb_axi_lite_regs.dut.wdata_buf", label: "wdata_buf", group: "FG02", block: "AB001", source: "axi_lite_regs.v:39, 48, 50", related: ["S_AXI_WDATA"] },
+      { path: "tb_axi_lite_regs.dut.wstrb_buf", label: "wstrb_buf", group: "FG02", block: "AB001", source: "axi_lite_regs.v:40, 48, 50", related: ["S_AXI_WSTRB"] },
+      { path: "tb_axi_lite_regs.dut.control_reg", label: "control_reg", group: "FG02", block: "AB001", source: "axi_lite_regs.v:28, 48, 62", related: ["S_AXI_RDATA"] },
+      { path: "tb_axi_lite_regs.dut.data_reg", label: "data_reg", group: "FG02", block: "AB001", source: "axi_lite_regs.v:28, 50, 64", related: ["S_AXI_RDATA"] }
+    ];
+    const GROUP_TEXT = {
+      FG01: "CA01–CA03 continuously derive AWREADY, WREADY, and ARREADY from pending/response-valid state. AB001 reads these equations when testing channel handshakes. Source: axi_lite_regs.v:20–24.",
+      FG02: "AB001 captures AW and W independently, then updates only the selected register byte lanes when both pending flags were already set. Source: axi_lite_regs.v:34–55.",
+      FG03: "AB001 sets BRESP=OKAY and BVALID when a write commits; BVALID clears on a sampled BVALID && BREADY. Source: axi_lite_regs.v:43–56.",
+      FG04: "AB001 decodes accepted ARADDR to a register, constant STATUS value, or zero. RDATA/RRESP/RVALID are registered; RVALID clears when accepted. Source: axi_lite_regs.v:58–68.",
+      FG05: "AB001 samples active-low ARESETn only on posedge ACLK and clears register storage, staging, pending flags, and response outputs. Source: axi_lite_regs.v:26–33."
+    };
+    const byPath = new Map(SIGNALS.map(signal => [signal.path, signal]));
+    const el = id => document.getElementById(id);
+    let trace = null;
+    let selectedEdge = 0;
+    let selectedTime = null;
+    let selectedGroup = "FG01";
+    let selectedSignal = null;
+    let playTimer = null;
+    let playbackCursorTime = null;
+
+    function parseVcd(text) {
+      const scopes = [];
+      const declarations = [];
+      const idPaths = new Map();
+      const events = [];
+      let timestamp = 0;
+      let timescale = "unspecified";
+      let inDefinitions = true;
+      let ended = false;
+      const lines = text.split(/\r?\n/);
+      for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
+        const line = lines[lineNumber].trim();
+        if (!line) continue;
+        if (line.startsWith("$timescale")) {
+          const parts = [line.replace("$timescale", "").replace("$end", "").trim()];
+          while (!line.endsWith("$end") && lineNumber + 1 < lines.length) {
+            const next = lines[++lineNumber].trim();
+            if (next !== "$end") parts.push(next);
+            if (next === "$end") break;
+          }
+          timescale = parts.join(" ").trim();
+        } else if (line.startsWith("$scope ")) {
+          const parts = line.split(/\s+/);
+          if (parts.length < 4) throw new Error(`Malformed $scope at line ${lineNumber + 1}`);
+          scopes.push(parts[2]);
+        } else if (line.startsWith("$upscope")) {
+          if (!scopes.length) throw new Error(`Unbalanced $upscope at line ${lineNumber + 1}`);
+          scopes.pop();
+        } else if (line.startsWith("$var ")) {
+          const parts = line.split(/\s+/);
+          if (parts.length < 6) throw new Error(`Malformed $var at line ${lineNumber + 1}`);
+          const width = Number(parts[2]);
+          const id = parts[3];
+          const name = parts[4];
+          const path = [...scopes, name].join(".");
+          if (!Number.isInteger(width) || width < 1) throw new Error(`Invalid width for ${path}`);
+          declarations.push({ path, id, width });
+          if (!idPaths.has(id)) idPaths.set(id, []);
+          idPaths.get(id).push(path);
+        } else if (line.startsWith("$enddefinitions")) {
+          inDefinitions = false;
+        } else if (line.startsWith("$end")) {
+          continue;
+        } else if (line.startsWith("$")) {
+          if (line.startsWith("$dumpoff") || line.startsWith("$dumpon") || line.startsWith("$dumpvars") || line.startsWith("$dumpall")) continue;
+          if (line.startsWith("$comment") || line.startsWith("$date") || line.startsWith("$version")) continue;
+          if (line.includes("$end")) continue;
+        } else if (!inDefinitions && line[0] === "#") {
+          const nextTime = Number(line.slice(1));
+          if (!Number.isSafeInteger(nextTime) || nextTime < timestamp) throw new Error(`Invalid or decreasing timestamp at line ${lineNumber + 1}`);
+          timestamp = nextTime;
+        } else if (!inDefinitions) {
+          let id;
+          let value;
+          if (/^[bB][01xXzZ]+\s+\S+$/.test(line)) {
+            const parts = line.split(/\s+/);
+            value = parts[0].slice(1).toLowerCase();
+            id = parts[1];
+          } else if (/^[01xXzZ]\S+$/.test(line)) {
+            value = line[0].toLowerCase();
+            id = line.slice(1);
+          } else if (/^[rR]/.test(line) || /^[sS]/.test(line)) {
+            continue;
+          } else {
+            throw new Error(`Unsupported VCD record at line ${lineNumber + 1}: ${line.slice(0, 60)}`);
+          }
+          if (!idPaths.has(id)) throw new Error(`Value change refers to undeclared identifier at line ${lineNumber + 1}`);
+          events.push({ time: timestamp, id, value });
+          ended = true;
+        }
+      }
+      if (!declarations.length || !ended) throw new Error("Trace has no declarations or value changes.");
+      const clocks = declarations.filter(item => item.path === "tb_axi_lite_regs.dut.ACLK");
+      if (!clocks.length) throw new Error("Required clock tb_axi_lite_regs.dut.ACLK was not found.");
+      const clock = clocks[0];
+      let value = "x";
+      const edgeTimes = [];
+      for (const event of events) {
+        if (event.id !== clock.id) continue;
+        const next = event.value.slice(-1);
+        if (value !== "1" && next === "1") edgeTimes.push(event.time);
+        value = next;
+      }
+      if (edgeTimes.length < 2) throw new Error("The selected ACLK has fewer than two recognizable rising edges.");
+      return { declarations, idPaths, events, edgeTimes, timescale, endTime: timestamp, clockId: clock.id };
+    }
+
+    function formatValue(raw, width) {
+      let value = (raw || "x").toLowerCase();
+      if (value.length === 1 && (value === "x" || value === "z")) value = value.repeat(width);
+      else value = value.padStart(width, /^[xz]/.test(value) ? value[0] : "0").slice(-width);
+      if (/[xz]/.test(value)) return value;
+      if (width > 1) {
+        const hex = BigInt("0b" + value).toString(16).toUpperCase();
+        return `0x${hex.padStart(Math.ceil(width / 4), "0")}`;
+      }
+      return value;
+    }
+
+    function snapshotAt(time) {
+      const values = new Map();
+      const changed = new Set();
+      for (const event of trace.events) {
+        if (event.time > time) break;
+        const previous = values.get(event.id);
+        values.set(event.id, event.value);
+        if (event.time === time && previous !== event.value) changed.add(event.id);
+      }
+      return { values, changed };
+    }
+
+    function signalValue(signal, snapshot) {
+      const declaration = trace.declarations.find(item => item.path === signal.path);
+      if (!declaration) return null;
+      return { declaration, raw: snapshot.values.get(declaration.id) || "x", changed: snapshot.changed.has(declaration.id) };
+    }
+
+    function render() {
+      if (!trace) return;
+      const edgeTime = trace.edgeTimes[selectedEdge];
+      const cursorTime = selectedTime === null ? edgeTime : selectedTime;
+      const snapshot = snapshotAt(el("snapshot-phase").value === "pre" ? cursorTime - 1 : cursorTime);
+      explainEdge(cursorTime);
+      renderFlow(cursorTime, snapshot);
+      el("readout").textContent = selectedTime === null
+        ? `Edge ${selectedEdge + 1}/${trace.edgeTimes.length} · ${edgeTime} ${trace.timescale}`
+        : `Timestamp ${selectedTime} ${trace.timescale} · edge index ${selectedEdge + 1}/${trace.edgeTimes.length}`;
+      el("timeline").value = String(selectedEdge);
+      el("cycle-input").value = String(selectedEdge + 1);
+      el("timestamp-input").value = String(cursorTime);
+      const filterGroup = el("signal-filter").value === "group";
+      const visibleSignals = SIGNALS.filter(signal => !filterGroup || signal.group === selectedGroup);
+      const rows = visibleSignals.map(signal => {
+        const result = signalValue(signal, snapshot);
+        const value = result ? formatValue(result.raw, result.declaration.width) : "not present";
+        const stateClass = /x/i.test(value) ? "unknown" : /z/i.test(value) ? "highz" : "";
+        const rowClass = `${result && result.changed ? "changed " : ""}${selectedSignal === signal.path ? "selected" : ""}`;
+        return `<tr class="${rowClass.trim()}"><td><span class="signal-name" data-path="${signal.path}">${signal.label}</span></td><td class="value ${stateClass}">${value}</td><td>${signal.group} · ${signal.block}</td></tr>`;
+      }).join("");
+      el("signal-rows").innerHTML = rows || '<tr><td colspan="3" class="muted">No tracked signals in this group.</td></tr>';
+      el("signal-rows").querySelectorAll(".signal-name").forEach(node => {
+        node.addEventListener("click", () => selectSignal(node.dataset.path));
+      });
+      el("prev").disabled = selectedTime === null
+        ? selectedEdge <= 0
+        : !trace.edgeTimes.some(time => time < selectedTime);
+      el("next").disabled = selectedTime === null
+        ? selectedEdge >= trace.edgeTimes.length - 1
+        : !trace.edgeTimes.some(time => time > selectedTime);
+    }
+
+    function showContext(signal) {
+      const panel = el("rtl-context");
+      if (!signal) {
+        panel.innerHTML = `<p>Select a signal for its source anchor and static relationships.</p><div class="source-row"><strong>${selectedGroup}</strong> · ${GROUP_TEXT[selectedGroup]}</div><div class="source-row"><a href="./axi_lite_regs.v#L26">Open DUT process AB001 at axi_lite_regs.v:26</a></div>`;
+        return;
+      }
+      const sourceFile = signal.source.startsWith("tb_") ? "tb_axi_lite_regs.v" : "axi_lite_regs.v";
+      const line = Number(signal.source.match(/:(\d+)/)?.[1] || 1);
+      const relations = signal.related.length ? signal.related.join(", ") : "No additional mapped signal";
+      panel.innerHTML = `<div class="rtl-title">${signal.path}</div>
+        <div class="source-row"><strong>${signal.group}</strong> · ${signal.block}</div>
+        <div class="source-row">Source: <a href="./${sourceFile}#L${line}">${signal.source}</a></div>
+        <div class="source-row">Static RTL relationship: ${relations}</div>
+        <div class="source-row">The trace shows a value at the selected timestamp; it does not prove that this process executed.</div>
+        <div class="source-row"><a href="./axi_lite_regs_ARCHITECTURE.md">Open architecture document</a></div>`;
+    }
+
+    function selectSignal(path) {
+      const signal = byPath.get(path);
+      if (!signal) return;
+      selectedSignal = path;
+      selectedGroup = signal.group;
+      document.querySelectorAll(".group").forEach(button => button.classList.toggle("active", button.dataset.group === selectedGroup));
+      showContext(signal);
+      render();
+    }
+
+    function stopPlayback() {
+      if (playTimer !== null) window.clearInterval(playTimer);
+      playTimer = null;
+      el("play").textContent = "Play";
+    }
+
+    function startPlayback() {
+      if (!trace || playTimer !== null) return;
+      if (selectedEdge >= trace.edgeTimes.length - 1) selectedEdge = 0;
+      playbackCursorTime = selectedTime === null ? trace.edgeTimes[selectedEdge] : selectedTime;
+      selectedTime = null;
+      el("play").textContent = "Pause";
+      playTimer = window.setInterval(() => {
+        const nextEdge = trace.edgeTimes.findIndex(time => time > playbackCursorTime);
+        if (nextEdge < 0) {
+          stopPlayback();
+          return;
+        }
+        selectedEdge = nextEdge;
+        playbackCursorTime = trace.edgeTimes[nextEdge];
+        render();
+      }, Number(el("speed").value));
+    }
+
+    function enableControls() {
+      ["play", "prev", "next", "cycle-input", "jump", "timestamp-input", "timestamp-jump", "timeline", "signal-filter", "clock-select"].forEach(id => { el(id).disabled = false; });
+      el("timeline").max = String(trace.edgeTimes.length - 1);
+      el("cycle-input").max = String(trace.edgeTimes.length);
+      el("timestamp-input").max = String(trace.endTime);
+      el("edge-count").textContent = `${trace.edgeTimes.length} rising edges`;
+    }
+
+    el("trace-file").addEventListener("change", async event => {
+      stopPlayback();
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const status = el("trace-status");
+      status.className = "status";
+      status.textContent = `Reading ${file.name}…`;
+      try {
+        const parsed = parseVcd(await file.text());
+        trace = parsed;
+        selectedEdge = 0;
+        selectedTime = null;
+        enableControls();
+        const missing = SIGNALS.filter(signal => !parsed.declarations.some(declaration => declaration.path === signal.path)).map(signal => signal.label);
+        status.className = "status ready";
+        status.textContent = `${file.name} · ${parsed.declarations.length} declarations · ${parsed.events.length} value changes · ${parsed.timescale} · ends at ${parsed.endTime} ${parsed.timescale}${missing.length ? ` · unmapped tracked signals: ${missing.join(", ")}` : ""}`;
+        showContext(null);
+        render();
+      } catch (error) {
+        trace = null;
+        status.className = "status error";
+        status.textContent = `Could not load VCD: ${error.message}`;
+        el("readout").textContent = "Trace load failed";
+      }
+    });
+    el("play").addEventListener("click", () => playTimer === null ? startPlayback() : stopPlayback());
+    el("prev").addEventListener("click", () => {
+      stopPlayback();
+      const cursorTime = selectedTime === null ? trace.edgeTimes[selectedEdge] : selectedTime;
+      for (let index = trace.edgeTimes.length - 1; index >= 0; index--) {
+        if (trace.edgeTimes[index] < cursorTime) { selectedEdge = index; break; }
+      }
+      selectedTime = null;
+      render();
+    });
+    el("next").addEventListener("click", () => {
+      stopPlayback();
+      const cursorTime = selectedTime === null ? trace.edgeTimes[selectedEdge] : selectedTime;
+      const index = trace.edgeTimes.findIndex(time => time > cursorTime);
+      if (index >= 0) selectedEdge = index;
+      selectedTime = null;
+      render();
+    });
+    el("timeline").addEventListener("input", () => { stopPlayback(); selectedTime = null; selectedEdge = Number(el("timeline").value); render(); });
+    el("jump").addEventListener("click", () => {
+      stopPlayback();
+      const edge = Number(el("cycle-input").value);
+      if (Number.isInteger(edge) && edge >= 1 && edge <= trace.edgeTimes.length) {
+        selectedEdge = edge - 1;
+        selectedTime = null;
+        render();
+      }
+    });
+    el("cycle-input").addEventListener("keydown", event => { if (event.key === "Enter") el("jump").click(); });
+    el("timestamp-jump").addEventListener("click", () => {
+      stopPlayback();
+      const time = Number(el("timestamp-input").value);
+      if (!Number.isSafeInteger(time) || time < 0 || time > trace.endTime) return;
+      selectedTime = time;
+      let precedingEdge = -1;
+      for (let index = 0; index < trace.edgeTimes.length; index++) {
+        if (trace.edgeTimes[index] <= time) precedingEdge = index;
+        else break;
+      }
+      selectedEdge = precedingEdge < 0 ? 0 : precedingEdge;
+      render();
+    });
+    el("timestamp-input").addEventListener("keydown", event => { if (event.key === "Enter") el("timestamp-jump").click(); });
+    el("signal-filter").addEventListener("change", render);
+    document.querySelectorAll(".group").forEach(button => button.addEventListener("click", () => {
+      selectedGroup = button.dataset.group;
+      selectedSignal = null;
+      document.querySelectorAll(".group").forEach(item => item.classList.toggle("active", item === button));
+      showContext(null);
+      render();
+    }));
+
+    const EMBEDDED_VCD = "$date\n\tSun Nov 01 23:42:12 2026\n$end\n$version\n\tIcarus Verilog\n$end\n$timescale\n\t1ps\n$end\n$scope module tb_axi_lite_regs $end\n$var wire 1 ! wready $end\n$var wire 1 \" rvalid $end\n$var wire 2 # rresp [1:0] $end\n$var wire 32 $ rdata [31:0] $end\n$var wire 1 % bvalid $end\n$var wire 2 & bresp [1:0] $end\n$var wire 1 ' awready $end\n$var wire 1 ( arready $end\n$var reg 8 ) araddr [7:0] $end\n$var reg 1 * arvalid $end\n$var reg 8 + awaddr [7:0] $end\n$var reg 1 , awvalid $end\n$var reg 1 - bready $end\n$var reg 1 . clk $end\n$var reg 2 / held_bresp [1:0] $end\n$var reg 32 0 held_rdata [31:0] $end\n$var reg 2 1 held_rresp [1:0] $end\n$var reg 1 2 rready $end\n$var reg 1 3 rstn $end\n$var reg 1 4 stalled_b $end\n$var reg 1 5 stalled_r $end\n$var reg 32 6 wdata [31:0] $end\n$var reg 4 7 wstrb [3:0] $end\n$var reg 1 8 wvalid $end\n$var integer 32 9 cycles [31:0] $end\n$scope module dut $end\n$var wire 1 . ACLK $end\n$var wire 1 3 ARESETn $end\n$var wire 8 : S_AXI_ARADDR [7:0] $end\n$var wire 1 * S_AXI_ARVALID $end\n$var wire 8 ; S_AXI_AWADDR [7:0] $end\n$var wire 1 ' S_AXI_AWREADY $end\n$var wire 1 , S_AXI_AWVALID $end\n$var wire 1 - S_AXI_BREADY $end\n$var wire 1 2 S_AXI_RREADY $end\n$var wire 32 < S_AXI_WDATA [31:0] $end\n$var wire 1 ! S_AXI_WREADY $end\n$var wire 4 = S_AXI_WSTRB [3:0] $end\n$var wire 1 8 S_AXI_WVALID $end\n$var wire 1 ( S_AXI_ARREADY $end\n$var reg 2 > S_AXI_BRESP [1:0] $end\n$var reg 1 % S_AXI_BVALID $end\n$var reg 32 ? S_AXI_RDATA [31:0] $end\n$var reg 2 @ S_AXI_RRESP [1:0] $end\n$var reg 1 \" S_AXI_RVALID $end\n$var reg 1 A aw_pending $end\n$var reg 8 B awaddr_buf [7:0] $end\n$var reg 32 C control_reg [31:0] $end\n$var reg 32 D data_reg [31:0] $end\n$var reg 1 E w_pending $end\n$var reg 32 F wdata_buf [31:0] $end\n$var reg 4 G wstrb_buf [3:0] $end\n$var integer 32 H k [31:0] $end\n$upscope $end\n$scope task finish_b $end\n$var integer 32 I hold_cycles [31:0] $end\n$var integer 32 J n [31:0] $end\n$upscope $end\n$scope task read_check $end\n$var reg 8 K addr [7:0] $end\n$var reg 32 L expected [31:0] $end\n$upscope $end\n$scope task reset_during_transaction $end\n$var integer 32 M mode [31:0] $end\n$var integer 32 N n [31:0] $end\n$upscope $end\n$scope task send_aw $end\n$var reg 8 O addr [7:0] $end\n$upscope $end\n$scope task send_w $end\n$var reg 32 P value [31:0] $end\n$upscope $end\n$scope task split_write $end\n$var reg 32 Q value [31:0] $end\n$var integer 32 R aw_first [31:0] $end\n$var integer 32 S n [31:0] $end\n$upscope $end\n$scope task stalled_read $end\n$var integer 32 T n [31:0] $end\n$upscope $end\n$scope task write_reg $end\n$var reg 8 U addr [7:0] $end\n$var reg 4 V strobe [3:0] $end\n$var reg 32 W value [31:0] $end\n$upscope $end\n$upscope $end\n$enddefinitions $end\n$comment Show the parameter values. $end\n$dumpall\n$end\n#0\n$dumpvars\nbx W\nbx V\nbx U\nbx T\nbx S\nbx R\nbx Q\nbx P\nbx O\nbx N\nbx M\nbx L\nbx K\nbx J\nbx I\nbx H\nbx G\nbx F\nxE\nbx D\nbx C\nbx B\nxA\nbx @\nbx ?\nbx >\nb0 =\nb0 <\nb0 ;\nb0 :\nb0 9\n08\nb0 7\nb0 6\n05\n04\n03\n02\nbx 1\nbx 0\nbx /\n0.\n0-\n0,\nb0 +\n0*\nb0 )\nx(\nx'\nbx &\nx%\nbx $\nbx #\nx\"\nx!\n$end\n#5000\n1!\n1'\nb0 $\nb0 ?\nb0 #\nb0 @\n1(\n0\"\nb0 &\nb0 >\n0%\n0E\n0A\nb0 G\nb0 F\nb0 B\nb0 D\nb0 C\nb1 9\n1.\n#10000\n0.\n#15000\nb10 9\n1.\n#20000\n0.\n#25000\nb11 9\n1.\n#30000\n0.\n#35000\nb100 9\n1.\n#40000\nb0 L\nb0 K\n13\n0.\n#45000\nb101 9\nb0 0\nb0 1\nb0 /\n1.\n#50000\n1*\n0.\n#55000\nb110 9\n0(\n1\"\n1.\n#60000\n0*\n0.\n#65000\nb111 9\n15\n1.\n#70000\n12\n0.\n#75000\n05\nb1000 9\n1(\n0\"\n1.\n#80000\nb1 L\nb100 K\n02\n0.\n#85000\nb1001 9\n1.\n#90000\n1*\nb100 )\nb100 :\n0.\n#95000\nb1010 9\nb1 $\nb1 ?\n0(\n1\"\n1.\n#100000\n0*\n0.\n#105000\nb1011 9\nb1 0\n15\n1.\n#110000\n12\n0.\n#115000\n05\nb1100 9\n1(\n0\"\n1.\n#120000\nb1111 V\nb10010001101000101011001111000 W\nb0 U\n02\n0.\n#125000\nb1101 9\n1.\n#130000\n18\nb1111 7\nb1111 =\nb10010001101000101011001111000 6\nb10010001101000101011001111000 <\n1,\n0.\n#135000\n0!\n0'\nb1110 9\n1E\nb1111 G\nb10010001101000101011001111000 F\n1A\n1.\n#140000\n08\n0,\n0.\n#145000\n0E\n0A\nb10010001101000101011001111000 C\n1%\nb1111 9\nb100 H\n1.\n#150000\n1-\n0.\n#155000\n1'\n1!\nb10000 9\n0%\n1.\n#160000\nb10010001101000101011001111000 L\nb0 K\n0-\n0.\n#165000\nb10001 9\n1.\n#170000\n1*\nb0 )\nb0 :\n0.\n#175000\nb10010 9\nb10010001101000101011001111000 $\nb10010001101000101011001111000 ?\n0(\n1\"\n1.\n#180000\n0*\n0.\n#185000\nb10011 9\nb10010001101000101011001111000 0\n15\n1.\n#190000\n12\n0.\n#195000\n05\nb10100 9\n1(\n0\"\n1.\n#200000\nb10 V\nb1010101100000000 W\n02\n0.\n#205000\nb10101 9\n1.\n#210000\n18\nb10 7\nb10 =\nb1010101100000000 6\nb1010101100000000 <\n1,\n0.\n#215000\n0!\n0'\nb10110 9\n1E\nb10 G\nb1010101100000000 F\n1A\n1.\n#220000\n08\n0,\n0.\n#225000\n0E\n0A\nb10010001101001010101101111000 C\n1%\nb10111 9\nb100 H\n1.\n#230000\n1-\n0.\n#235000\n1'\n1!\nb11000 9\n0%\n1.\n#240000\nb10010001101001010101101111000 L\n0-\n0.\n#245000\nb11001 9\n1.\n#250000\n1*\n0.\n#255000\nb11010 9\nb10010001101001010101101111000 $\nb10010001101001010101101111000 ?\n0(\n1\"\n1.\n#260000\n0*\n0.\n#265000\nb11011 9\nb10010001101001010101101111000 0\n15\n1.\n#270000\n12\n0.\n#275000\n05\nb11100 9\n1(\n0\"\n1.\n#280000\nb1111 V\nb11011110101011011011111011101111 W\nb1000 U\n02\n0.\n#285000\nb11101 9\n1.\n#290000\n18\nb1111 7\nb1111 =\nb11011110101011011011111011101111 6\nb11011110101011011011111011101111 <\n1,\nb1000 +\nb1000 ;\n0.\n#295000\n0!\n0'\nb11110 9\n1E\nb1111 G\nb11011110101011011011111011101111 F\n1A\nb1000 B\n1.\n#300000\n08\n0,\n0.\n#305000\n0E\n0A\nb11011110101011011011111011101111 D\n1%\nb11111 9\nb100 H\n1.\n#310000\n1-\n0.\n#315000\n1'\n1!\nb100000 9\n0%\n1.\n#320000\nb11011110101011011011111011101111 L\nb1000 K\n0-\n0.\n#325000\nb100001 9\n1.\n#330000\n1*\nb1000 )\nb1000 :\n0.\n#335000\nb100010 9\nb11011110101011011011111011101111 $\nb11011110101011011011111011101111 ?\n0(\n1\"\n1.\n#340000\n0*\n0.\n#345000\nb100011 9\nb11011110101011011011111011101111 0\n15\n1.\n#350000\n12\n0.\n#355000\n05\nb100100 9\n1(\n0\"\n1.\n#360000\nb11111111111111111111111111111111 W\nb100 U\n02\n0.\n#365000\nb100101 9\n1.\n#370000\n18\nb11111111111111111111111111111111 6\nb11111111111111111111111111111111 <\n1,\nb100 +\nb100 ;\n0.\n#375000\n0!\n0'\nb100110 9\n1E\nb11111111111111111111111111111111 F\n1A\nb100 B\n1.\n#380000\n08\n0,\n0.\n#385000\n0E\n0A\n1%\nb100111 9\n1.\n#390000\n1-\n0.\n#395000\n1'\n1!\nb101000 9\n0%\n1.\n#400000\nb1 L\nb100 K\n0-\n0.\n#405000\nb101001 9\n1.\n#410000\n1*\nb100 )\nb100 :\n0.\n#415000\nb101010 9\nb1 $\nb1 ?\n0(\n1\"\n1.\n#420000\n0*\n0.\n#425000\nb101011 9\nb1 0\n15\n1.\n#430000\n12\n0.\n#435000\n05\nb101100 9\n1(\n0\"\n1.\n#440000\nb0 O\nb10100001101100101100001111010100 Q\nb1 R\n02\n0.\n#445000\nb101101 9\n1.\n#450000\n1,\nb0 +\nb0 ;\n0.\n#455000\n0'\nb101110 9\n1A\nb0 B\n1.\n#460000\nb0 S\nb11111100 +\nb11111100 ;\n0,\n0.\n#465000\nb101111 9\n1.\n#470000\nb1 S\n0.\n#475000\nb110000 9\n1.\n#480000\nb10 S\n0.\n#485000\nb110001 9\n1.\n#490000\nb11 S\n0.\n#495000\nb110010 9\n1.\n#500000\nb100 S\n0.\n#505000\nb110011 9\n1.\n#510000\nb101 S\n0.\n#515000\nb110100 9\n1.\n#520000\nb10100001101100101100001111010100 P\nb110 S\n0.\n#525000\nb110101 9\n1.\n#530000\n18\nb10100001101100101100001111010100 6\nb10100001101100101100001111010100 <\n0.\n#535000\n0!\nb110110 9\n1E\nb10100001101100101100001111010100 F\n1.\n#540000\nb1100 I\nb0 7\nb0 =\nb0 6\nb0 <\n08\n0.\n#545000\nb0 J\n0E\n0A\nb10100001101100101100001111010100 C\n1%\nb110111 9\nb100 H\n1.\n#550000\nb1 J\n0.\n#555000\n14\nb111000 9\n1.\n#560000\nb10 J\n0.\n#565000\nb111001 9\n1.\n#570000\nb11 J\n0.\n#575000\nb111010 9\n1.\n#580000\nb100 J\n0.\n#585000\nb111011 9\n1.\n#590000\nb101 J\n0.\n#595000\nb111100 9\n1.\n#600000\nb110 J\n0.\n#605000\nb111101 9\n1.\n#610000\nb111 J\n0.\n#615000\nb111110 9\n1.\n#620000\nb1000 J\n0.\n#625000\nb111111 9\n1.\n#630000\nb1001 J\n0.\n#635000\nb1000000 9\n1.\n#640000\nb1010 J\n0.\n#645000\nb1000001 9\n1.\n#650000\nb1011 J\n0.\n#655000\nb1000010 9\n1.\n#660000\nb1100 J\n0.\n#665000\nb1000011 9\n1.\n#670000\n1-\n0.\n#675000\n1'\n1!\n04\nb1000100 9\n0%\n1.\n#680000\nb10100001101100101100001111010100 L\nb0 K\n0-\n0.\n#685000\nb1000101 9\n1.\n#690000\n1*\nb0 )\nb0 :\n0.\n#695000\nb1000110 9\nb10100001101100101100001111010100 $\nb10100001101100101100001111010100 ?\n0(\n1\"\n1.\n#700000\n0*\n0.\n#705000\nb1000111 9\nb10100001101100101100001111010100 0\n15\n1.\n#710000\n12\n0.\n#715000\n05\nb1001000 9\n1(\n0\"\n1.\n#720000\nb10001001000100011001101000100 P\nb10001001000100011001101000100 Q\nb0 R\n02\n0.\n#725000\nb1001001 9\n1.\n#730000\n18\nb1111 7\nb1111 =\nb10001001000100011001101000100 6\nb10001001000100011001101000100 <\n0.\n#735000\n0!\nb1001010 9\n1E\nb10001001000100011001101000100 F\n1.\n#740000\nb0 S\nb0 7\nb0 =\nb0 6\nb0 <\n08\n0.\n#745000\nb1001011 9\n1.\n#750000\nb1 S\n0.\n#755000\nb1001100 9\n1.\n#760000\nb10 S\n0.\n#765000\nb1001101 9\n1.\n#770000\nb11 S\n0.\n#775000\nb1001110 9\n1.\n#780000\nb100 S\n0.\n#785000\nb1001111 9\n1.\n#790000\nb101 S\n0.\n#795000\nb1010000 9\n1.\n#800000\nb110 S\n0.\n#805000\nb1010001 9\n1.\n#810000\n1,\nb0 +\nb0 ;\n0.\n#815000\n0'\nb1010010 9\n1A\n1.\n#820000\nb11111100 +\nb11111100 ;\n0,\n0.\n#825000\nb0 J\n0E\n0A\nb10001001000100011001101000100 C\n1%\nb1010011 9\nb100 H\n1.\n#830000\nb1 J\n0.\n#835000\n14\nb1010100 9\n1.\n#840000\nb10 J\n0.\n#845000\nb1010101 9\n1.\n#850000\nb11 J\n0.\n#855000\nb1010110 9\n1.\n#860000\nb100 J\n0.\n#865000\nb1010111 9\n1.\n#870000\nb101 J\n0.\n#875000\nb1011000 9\n1.\n#880000\nb110 J\n0.\n#885000\nb1011001 9\n1.\n#890000\nb111 J\n0.\n#895000\nb1011010 9\n1.\n#900000\nb1000 J\n0.\n#905000\nb1011011 9\n1.\n#910000\nb1001 J\n0.\n#915000\nb1011100 9\n1.\n#920000\nb1010 J\n0.\n#925000\nb1011101 9\n1.\n#930000\nb1011 J\n0.\n#935000\nb1011110 9\n1.\n#940000\nb1100 J\n0.\n#945000\nb1011111 9\n1.\n#950000\n1-\n0.\n#955000\n1'\n1!\n04\nb1100000 9\n0%\n1.\n#960000\nb10001001000100011001101000100 L\n0-\n0.\n#965000\nb1100001 9\n1.\n#970000\n1*\n0.\n#975000\nb1100010 9\nb10001001000100011001101000100 $\nb10001001000100011001101000100 ?\n0(\n1\"\n1.\n#980000\n0*\n0.\n#985000\nb1100011 9\nb10001001000100011001101000100 0\n15\n1.\n#990000\n12\n0.\n#995000\n05\nb1100100 9\n1(\n0\"\n1.\n#1000000\n02\n0.\n#1005000\nb1100101 9\n1.\n#1010000\n1*\n0.\n#1015000\nb1100110 9\n0(\n1\"\n1.\n#1020000\nb1010101011001100111011110001000 W\nb0 U\nb0 T\nb1000 )\nb1000 :\n0*\n0.\n#1025000\nb1100111 9\n15\n1.\n#1030000\nb1 T\n18\nb1111 7\nb1111 =\nb1010101011001100111011110001000 6\nb1010101011001100111011110001000 <\n1,\nb0 +\nb0 ;\n0.\n#1035000\n0!\n0'\nb1101000 9\n1E\nb1010101011001100111011110001000 F\n1A\n1.\n#1040000\nb10 T\n08\n0,\n0.\n#1045000\n0E\n0A\nb1010101011001100111011110001000 C\n1%\nb1101001 9\nb100 H\n1.\n#1050000\nb11 T\n1-\n0.\n#1055000\n1'\n1!\nb1101010 9\n0%\n1.\n#1060000\n0-\nb100 T\n0.\n#1065000\nb1101011 9\n1.\n#1070000\nb101 T\n0.\n#1075000\nb1101100 9\n1.\n#1080000\nb110 T\n0.\n#1085000\nb1101101 9\n1.\n#1090000\nb111 T\n0.\n#1095000\nb1101110 9\n1.\n#1100000\nb1000 T\n0.\n#1105000\nb1101111 9\n1.\n#1110000\nb1001 T\n0.\n#1115000\nb1110000 9\n1.\n#1120000\nb1010 T\n0.\n#1125000\nb1110001 9\n1.\n#1130000\nb1011 T\n0.\n#1135000\nb1110010 9\n1.\n#1140000\nb1100 T\n0.\n#1145000\nb1110011 9\n1.\n#1150000\nb1101 T\n0.\n#1155000\nb1110100 9\n1.\n#1160000\nb1110 T\n0.\n#1165000\nb1110101 9\n1.\n#1170000\nb1111 T\n0.\n#1175000\nb1110110 9\n1.\n#1180000\nb10000 T\n0.\n#1185000\nb1110111 9\n1.\n#1190000\n12\n0.\n#1195000\n05\nb1111000 9\n1(\n0\"\n1.\n#1200000\nb1010101011001100111011110001000 L\n02\n0.\n#1205000\nb1111001 9\n1.\n#1210000\n1*\nb0 )\nb0 :\n0.\n#1215000\nb1111010 9\nb1010101011001100111011110001000 $\nb1010101011001100111011110001000 ?\n0(\n1\"\n1.\n#1220000\n0*\n0.\n#1225000\nb1111011 9\nb1010101011001100111011110001000 0\n15\n1.\n#1230000\n12\n0.\n#1235000\n05\nb1111100 9\n1(\n0\"\n1.\n#1240000\nb10000111011001010100001100100001 W\nb1000 U\n02\n0.\n#1245000\nb1111101 9\n1.\n#1250000\n1*\n18\nb10000111011001010100001100100001 6\nb10000111011001010100001100100001 <\n1,\nb1000 +\nb1000 ;\n0.\n#1255000\n0!\n0'\nb1111110 9\n0(\n1\"\n1E\nb10000111011001010100001100100001 F\n1A\nb1000 B\n1.\n#1260000\n0*\n08\n0,\n0.\n#1265000\n0E\n0A\nb10000111011001010100001100100001 D\n1%\nb1111111 9\n15\nb100 H\n1.\n#1270000\n12\n1-\n0.\n#1275000\n1'\n1!\n05\nb10000000 9\n1(\n0\"\n0%\n1.\n#1280000\nb10000111011001010100001100100001 L\nb1000 K\n0-\n02\n0.\n#1285000\nb10000001 9\n1.\n#1290000\n1*\nb1000 )\nb1000 :\n0.\n#1295000\nb10000010 9\nb10000111011001010100001100100001 $\nb10000111011001010100001100100001 ?\n0(\n1\"\n1.\n#1300000\n0*\n0.\n#1305000\nb10000011 9\nb10000111011001010100001100100001 0\n15\n1.\n#1310000\n12\n0.\n#1315000\n05\nb10000100 9\n1(\n0\"\n1.\n#1320000\nb0 M\n02\n0.\n#1325000\nb10000101 9\n1.\n#1330000\n1,\nb0 +\nb0 ;\n0.\n#1335000\n0'\nb10000110 9\n1A\nb0 B\n1.\n#1340000\nb11111100 +\nb11111100 ;\n0,\n0.\n#1345000\nb10000111 9\n1.\n#1350000\n03\n0.\n#1355000\n1'\nb10001000 9\nb0 $\nb0 ?\n0A\nb0 G\nb0 F\nb0 D\nb0 C\n1.\n#1360000\n0.\n#1365000\nb10001001 9\n1.\n#1370000\n0.\n#1375000\nb10001010 9\n1.\n#1380000\nb0 N\n13\n0.\n#1385000\nb10001011 9\nb0 0\n1.\n#1390000\nb1 N\n0.\n#1395000\nb10001100 9\n1.\n#1400000\nb10 N\n0.\n#1405000\nb10001101 9\n1.\n#1410000\nb11 N\n0.\n#1415000\nb10001110 9\n1.\n#1420000\nb100 N\n0.\n#1425000\nb10001111 9\n1.\n#1430000\nb0 L\nb0 K\nb101 N\n0.\n#1435000\nb10010000 9\n1.\n#1440000\n1*\nb0 )\nb0 :\n0.\n#1445000\n0(\n1\"\nb10010001 9\n1.\n#1450000\n0*\n0.\n#1455000\n15\nb10010010 9\n1.\n#1460000\n12\n0.\n#1465000\n1(\n0\"\nb10010011 9\n05\n1.\n#1470000\nb1000 K\n02\n0.\n#1475000\nb10010100 9\n1.\n#1480000\n1*\nb1000 )\nb1000 :\n0.\n#1485000\n0(\n1\"\nb10010101 9\n1.\n#1490000\n0*\n0.\n#1495000\n15\nb10010110 9\n1.\n#1500000\n12\n0.\n#1505000\n1(\n0\"\nb10010111 9\n05\n1.\n#1510000\nb1 L\nb100 K\n02\n0.\n#1515000\nb10011000 9\n1.\n#1520000\n1*\nb100 )\nb100 :\n0.\n#1525000\nb1 $\nb1 ?\n0(\n1\"\nb10011001 9\n1.\n#1530000\n0*\n0.\n#1535000\nb1 0\n15\nb10011010 9\n1.\n#1540000\n12\n0.\n#1545000\n1(\n0\"\nb10011011 9\n05\n1.\n#1550000\nb11001010111111101111000000001101 W\n02\n0.\n#1555000\nb10011100 9\n1.\n#1560000\n18\nb11001010111111101111000000001101 6\nb11001010111111101111000000001101 <\n1,\nb1000 +\nb1000 ;\n0.\n#1565000\n0!\n0'\n1E\nb1111 G\nb11001010111111101111000000001101 F\n1A\nb1000 B\nb10011101 9\n1.\n#1570000\n08\n0,\n0.\n#1575000\nb10011110 9\n0E\n0A\nb11001010111111101111000000001101 D\n1%\nb100 H\n1.\n#1580000\n1-\n0.\n#1585000\n1'\n1!\n0%\nb10011111 9\n1.\n#1590000\nb11001010111111101111000000001101 L\nb1000 K\n0-\n0.\n#1595000\nb10100000 9\n1.\n#1600000\n1*\nb1000 )\nb1000 :\n0.\n#1605000\nb11001010111111101111000000001101 $\nb11001010111111101111000000001101 ?\n0(\n1\"\nb10100001 9\n1.\n#1610000\n0*\n0.\n#1615000\nb11001010111111101111000000001101 0\n15\nb10100010 9\n1.\n#1620000\n12\n0.\n#1625000\n1(\n0\"\nb10100011 9\n05\n1.\n#1630000\nb10111010110100001011101011010000 P\nb1 M\n02\n0.\n#1635000\nb10100100 9\n1.\n#1640000\n18\nb10111010110100001011101011010000 6\nb10111010110100001011101011010000 <\n0.\n#1645000\n0!\n1E\nb10111010110100001011101011010000 F\nb10100101 9\n1.\n#1650000\nb0 7\nb0 =\nb0 6\nb0 <\n08\n0.\n#1655000\nb10100110 9\n1.\n#1660000\n03\n0.\n#1665000\n1!\nb0 $\nb0 ?\n0E\nb0 G\nb0 F\nb0 B\nb0 D\nb10100111 9\n1.\n#1670000\n0.\n#1675000\nb10101000 9\n1.\n#1680000\n0.\n#1685000\nb10101001 9\n1.\n#1690000\nb0 N\n13\n0.\n#1695000\nb0 0\nb10101010 9\n1.\n#1700000\nb1 N\n0.\n#1705000\nb10101011 9\n1.\n#1710000\nb10 N\n0.\n#1715000\nb10101100 9\n1.\n#1720000\nb11 N\n0.\n#1725000\nb10101101 9\n1.\n#1730000\nb100 N\n0.\n#1735000\nb10101110 9\n1.\n#1740000\nb0 L\nb0 K\nb101 N\n0.\n#1745000\nb10101111 9\n1.\n#1750000\n1*\nb0 )\nb0 :\n0.\n#1755000\nb10110000 9\n0(\n1\"\n1.\n#1760000\n0*\n0.\n#1765000\nb10110001 9\n15\n1.\n#1770000\n12\n0.\n#1775000\n05\nb10110010 9\n1(\n0\"\n1.\n#1780000\nb1000 K\n02\n0.\n#1785000\nb10110011 9\n1.\n#1790000\n1*\nb1000 )\nb1000 :\n0.\n#1795000\nb10110100 9\n0(\n1\"\n1.\n#1800000\n0*\n0.\n#1805000\nb10110101 9\n15\n1.\n#1810000\n12\n0.\n#1815000\n05\nb10110110 9\n1(\n0\"\n1.\n#1820000\nb1 L\nb100 K\n02\n0.\n#1825000\nb10110111 9\n1.\n#1830000\n1*\nb100 )\nb100 :\n0.\n#1835000\nb10111000 9\nb1 $\nb1 ?\n0(\n1\"\n1.\n#1840000\n0*\n0.\n#1845000\nb10111001 9\nb1 0\n15\n1.\n#1850000\n12\n0.\n#1855000\n05\nb10111010 9\n1(\n0\"\n1.\n#1860000\n02\n0.\n#1865000\nb10111011 9\n1.\n#1870000\n18\nb1111 7\nb1111 =\nb11001010111111101111000000001101 6\nb11001010111111101111000000001101 <\n1,\n0.\n#1875000\n0!\n0'\nb10111100 9\n1E\nb1111 G\nb11001010111111101111000000001101 F\n1A\nb1000 B\n1.\n#1880000\n08\n0,\n0.\n#1885000\n0E\n0A\nb11001010111111101111000000001101 D\n1%\nb10111101 9\nb100 H\n1.\n#1890000\n1-\n0.\n#1895000\n1'\n1!\nb10111110 9\n0%\n1.\n#1900000\nb11001010111111101111000000001101 L\nb1000 K\n0-\n0.\n#1905000\nb10111111 9\n1.\n#1910000\n1*\nb1000 )\nb1000 :\n0.\n#1915000\nb11000000 9\nb11001010111111101111000000001101 $\nb11001010111111101111000000001101 ?\n0(\n1\"\n1.\n#1920000\n0*\n0.\n#1925000\nb11000001 9\nb11001010111111101111000000001101 0\n15\n1.\n#1930000\n12\n0.\n#1935000\n05\nb11000010 9\n1(\n0\"\n1.\n#1940000\nb10 M\n02\n0.\n#1945000\nb11000011 9\n1.\n#1950000\n1*\n18\nb10111010110100001011101011010000 6\nb10111010110100001011101011010000 <\n1,\nb0 +\nb0 ;\n0.\n#1955000\n0!\n0'\nb11000100 9\n0(\n1\"\n1E\nb10111010110100001011101011010000 F\n1A\nb0 B\n1.\n#1960000\n0*\nb0 7\nb0 =\nb0 6\nb0 <\n08\nb11111100 +\nb11111100 ;\n0,\n0.\n#1965000\n0E\n0A\nb10111010110100001011101011010000 C\n1%\nb11000101 9\n15\nb100 H\n1.\n#1970000\n03\n0.\n#1975000\n1'\n1!\n05\nb11000110 9\nb0 $\nb0 ?\n1(\n0\"\n0%\nb0 G\nb0 F\nb0 D\nb0 C\n1.\n#1980000\n0.\n#1985000\nb11000111 9\n1.\n#1990000\n0.\n#1995000\nb11001000 9\n1.\n#2000000\nb0 N\n13\n0.\n#2005000\nb11001001 9\nb0 0\n1.\n#2010000\nb1 N\n0.\n#2015000\nb11001010 9\n1.\n#2020000\nb10 N\n0.\n#2025000\nb11001011 9\n1.\n#2030000\nb11 N\n0.\n#2035000\nb11001100 9\n1.\n#2040000\nb100 N\n0.\n#2045000\nb11001101 9\n1.\n#2050000\nb0 L\nb0 K\nb101 N\n0.\n#2055000\nb11001110 9\n1.\n#2060000\n1*\nb0 )\nb0 :\n0.\n#2065000\n0(\n1\"\nb11001111 9\n1.\n#2070000\n0*\n0.\n#2075000\n15\nb11010000 9\n1.\n#2080000\n12\n0.\n#2085000\n1(\n0\"\nb11010001 9\n05\n1.\n#2090000\nb1000 K\n02\n0.\n#2095000\nb11010010 9\n1.\n#2100000\n1*\nb1000 )\nb1000 :\n0.\n#2105000\n0(\n1\"\nb11010011 9\n1.\n#2110000\n0*\n0.\n#2115000\n15\nb11010100 9\n1.\n#2120000\n12\n0.\n#2125000\n1(\n0\"\nb11010101 9\n05\n1.\n#2130000\nb1 L\nb100 K\n02\n0.\n#2135000\nb11010110 9\n1.\n#2140000\n1*\nb100 )\nb100 :\n0.\n#2145000\nb1 $\nb1 ?\n0(\n1\"\nb11010111 9\n1.\n#2150000\n0*\n0.\n#2155000\nb1 0\n15\nb11011000 9\n1.\n#2160000\n12\n0.\n#2165000\n1(\n0\"\nb11011001 9\n05\n1.\n#2170000\n02\n0.\n#2175000\nb11011010 9\n1.\n#2180000\n18\nb1111 7\nb1111 =\nb11001010111111101111000000001101 6\nb11001010111111101111000000001101 <\n1,\nb1000 +\nb1000 ;\n0.\n#2185000\n0!\n0'\n1E\nb1111 G\nb11001010111111101111000000001101 F\n1A\nb1000 B\nb11011011 9\n1.\n#2190000\n08\n0,\n0.\n#2195000\nb11011100 9\n0E\n0A\nb11001010111111101111000000001101 D\n1%\nb100 H\n1.\n#2200000\n1-\n0.\n#2205000\n1'\n1!\n0%\nb11011101 9\n1.\n#2210000\nb11001010111111101111000000001101 L\nb1000 K\n0-\n0.\n#2215000\nb11011110 9\n1.\n#2220000\n1*\nb1000 )\nb1000 :\n0.\n#2225000\nb11001010111111101111000000001101 $\nb11001010111111101111000000001101 ?\n0(\n1\"\nb11011111 9\n1.\n#2230000\n0*\n0.\n#2235000\nb11001010111111101111000000001101 0\n15\nb11100000 9\n1.\n#2240000\n12\n0.\n#2245000\n1(\n0\"\nb11100001 9\n05\n1.\n#2250000\n02\n0.\n";
+    const TRACE_HASH = "1e7fb200d239775085dd2721903cdc03b05af2c6cdf81305c367c61737123cd2";
+
+    const extra = document.createElement("section");
+    extra.className = "panel";
+    extra.innerHTML = `<h2>波形觀察 · AXI4-Lite</h2><label>快照 <select id="snapshot-phase"><option value="post">時間戳全部更新後</option><option value="pre">時間戳更新前</option></select></label><p id="edge-explanation"></p><p class="muted">握手由上升緣前的 VALID / READY 判定。VCD 不提供 simulator scheduling region；快照不代表程序執行順序。此設計沒有明確編碼的 FSM。</p>`;
+    document.querySelector("main").prepend(extra);
+    el("snapshot-phase").addEventListener("change", render);
+    function explainEdge(time) {
+      const pre = snapshotAt(time - 1);
+      const get = name => {
+        const d = trace.declarations.find(d => d.path === "tb_axi_lite_regs.dut." + name);
+        return d ? pre.values.get(d.id) : "x";
+      };
+      const messages = [];
+      if (!trace.edgeTimes.includes(time)) messages.push("此時間點不是選定時脈的上升緣；以下僅顯示快照。");
+      else if (get("ARESETn") === "0") messages.push("上升緣前 ARESETn=0：依 RTL，同步 reset 分支會清除暫存器與回應狀態。");
+      else {
+        for (const c of ["AW", "W", "B", "AR", "R"]) {
+          const valid = get("S_AXI_"+c+"VALID"), ready = get("S_AXI_"+c+"READY");
+          if (valid === "1") messages.push(c + (ready === "1" ? "：上升緣完成握手" : ready === "0" ? "：VALID=1、READY=0，停等" : "：READY 未知"));
+        }
+      }
+      el("edge-explanation").textContent = time + " " + trace.timescale + " · " + (messages.join("；") || "此邊緣沒有觀察到 VALID=1 的通道。");
+    }
+
+    const flowPanel = document.createElement("section");
+    flowPanel.className="panel";
+    flowPanel.innerHTML=`<h2>資料如何流動？</h2><p>Master 發出位址與資料 → Slave 分別暫存 → 位址解碼與 byte mask → 更新暫存器 → 回應 Master。</p><div id="flow-diagram" style="overflow:auto"></div><p id="flow-story"></p><p class="muted">實線：資料／回應方向；虛線：控制條件。亮線表示所選上升緣符合 RTL 傳輸條件，並非訊號傳播速度。點選方塊可查看相關 RTL。所有方塊共用 ACLK；ARESETn 低有效同步重設。下游模組目前未實作。</p>`;
+    extra.after(flowPanel);
+    function renderFlow(time, snapshot) {
+      const pre=snapshotAt(time-1);
+      const raw=(name,snap=snapshot)=>{const d=trace.declarations.find(d=>d.path==="tb_axi_lite_regs.dut."+name);return d ? snap.values.get(d.id)||"x":"x";};
+      const value=name=>{const d=trace.declarations.find(d=>d.path==="tb_axi_lite_regs.dut."+name);return d?formatValue(raw(name),d.width):"missing";};
+      const edge=trace.edgeTimes.includes(time), reset=raw("ARESETn",pre)==="0";
+      const handshake=c=>edge&&!reset&&raw("S_AXI_"+c+"VALID",pre)==="1"&&raw("S_AXI_"+c+"READY",pre)==="1";
+      const commit=edge&&!reset&&raw("aw_pending",pre)==="1"&&raw("w_pending",pre)==="1"&&raw("S_AXI_BVALID",pre)==="0";
+      const box=(x,y,w,title,detail,signal)=>`<g tabindex="0" role="button" aria-label="${title}" data-signal="${signal}" style="cursor:pointer"><rect x="${x}" y="${y}" width="${w}" height="80" rx="12" fill="#202c39" stroke="#52677e"/><text x="${x+14}" y="${y+28}" fill="#e6edf3" font-size="16">${title}</text><text x="${x+14}" y="${y+55}" fill="#9ed5e9" font-size="13">${detail}</text></g>`;
+      const arrow=(d,label,x,y,active,control=false)=>`<path d="${d}" fill="none" stroke="${active?'#70e3a5':control?'#e5a84b':'#52677e'}" stroke-width="${active?5:2}" ${control?'stroke-dasharray="6 5"':''} marker-end="url(#flow-tip)"/><text x="${x}" y="${y}" fill="${active?'#70e3a5':'#bac8d7'}" font-size="13">${label}${active?' ●':''}</text>`;
+      el("flow-diagram").innerHTML=`<svg viewBox="0 0 1140 580" style="width:100%;min-width:850px" aria-label="AXI 資料路徑"><defs><marker id="flow-tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10" fill="#8cbea9"/></marker></defs>
+      <rect x="280" y="10" width="840" height="550" rx="18" fill="#121c27" stroke="#456176"/><text x="300" y="35" fill="#9eacba">axi_lite_regs · Slave · AB001 / ACLK</text>
+      ${box(10,60,220,'Master / Testbench','發送請求、接收回應','S_AXI_AWADDR')}
+      ${box(310,60,230,'AW 位址暫存 REG',value('awaddr_buf')+' · pending='+raw('aw_pending'),'awaddr_buf')}
+      ${box(310,190,230,'W 資料暫存 REG',value('wdata_buf'),'wdata_buf')}
+      ${box(600,120,230,'位址解碼 + WSTRB','mask = '+raw('wstrb_buf').padStart(4,'0'),'wstrb_buf')}
+      ${box(870,60,230,'CONTROL · 0x00',value('control_reg'),'control_reg')}
+      ${box(870,190,230,'DATA · 0x08',value('data_reg'),'data_reg')}
+      ${box(600,300,230,'B 寫入回應 REG','VALID='+raw('S_AXI_BVALID')+' · RESP='+value('S_AXI_BRESP'),'S_AXI_BVALID')}
+      ${box(310,430,230,'R 讀取回應 REG',value('S_AXI_RDATA')+' · V='+raw('S_AXI_RVALID'),'S_AXI_RDATA')}
+      ${box(870,430,230,'讀取多工選擇器','STATUS 0x04 固定 1','S_AXI_ARADDR')}
+      ${arrow('M230 90H310','AW 位址',238,78,handshake('AW'))}
+      ${arrow('M120 140V230H310','W 資料',135,218,handshake('W'))}
+      ${arrow('M540 100H570V140H600','',550,90,commit,true)}
+      ${arrow('M540 230H570V180H600','',550,250,commit)}
+      ${arrow('M830 140H850V100H870','',835,95,commit&&parseInt(raw('awaddr_buf',pre),2)===0)}
+      ${arrow('M830 180H850V230H870','',835,250,commit&&parseInt(raw('awaddr_buf',pre),2)===8)}
+      ${arrow('M715 200V300','兩個 pending=1 才提交',590,275,commit,true)}
+      ${arrow('M600 340H65V140','B 回應 / BREADY',110,328,handshake('B'))}
+      ${arrow('M980 270V430','暫存器讀值',990,385,handshake('AR'))}
+      ${arrow('M1100 140H1110V420H1010V430','CONTROL',1015,410,handshake('AR'),true)}
+      ${arrow('M30 140V535H970V510','AR 位址選擇 / ARVALID & ARREADY',100,553,handshake('AR'),true)}
+      ${arrow('M870 470H540','讀取值在 AR 握手時鎖存',575,455,handshake('AR'))}
+      ${arrow('M310 470H10V140','R 資料 / RREADY',30,410,handshake('R'))}
+      </svg>`;
+      el('flow-diagram').querySelectorAll('[data-signal]').forEach(n=>{const choose=()=>selectSignal('tb_axi_lite_regs.dut.'+n.dataset.signal);n.onclick=choose;n.onkeydown=e=>{if(e.key==='Enter')choose();};});
+      const notes=[];
+      if(reset&&edge)notes.push('同步 reset：清除暫存器、pending 與回應 VALID。');
+      if(handshake('AW'))notes.push('Master 的寫入位址被 AW buffer 接收。');
+      if(handshake('W'))notes.push('Master 的資料與 byte mask 被 W buffer 接收。');
+      if(commit)notes.push('兩個 buffer 在邊緣前都已備妥：依位址與 WSTRB 寫入，並建立 B 回應。新收到的 AW/W 不會在同一邊緣立即提交。');
+      if(handshake('AR'))notes.push('AR 位址決定讀取來源，資料鎖存到 RDATA。');
+      for(const c of ['B','R'])if(raw('S_AXI_'+c+'VALID')==='1'&&raw('S_AXI_'+c+'READY')==='0')notes.push(c+' 回應停等：由 Master 的 READY 決定何時接收。');
+      el('flow-story').textContent=(notes.join(' ')||'此時沒有新的傳輸；可逐拍觀察下一次交握。')+' CONTROL / DATA 目前只提供儲存與讀回，沒有 start、busy、done 或對外控制埠。';
+    }
+
+    trace = parseVcd(EMBEDDED_VCD);
+    enableControls();
+    el("trace-status").textContent = "已載入專案 wave.vcd · " + trace.edgeTimes.length + " 個上升緣 · 結束時間 " + trace.endTime + " " + trace.timescale + " · SHA-256 " + TRACE_HASH;
+    render();
+  </script>
+</body>
+</html>

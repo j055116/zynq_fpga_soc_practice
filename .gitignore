@@ -1,0 +1,18 @@
+# Generated simulator binaries, waveforms and logs
+*.vvp
+*.vcd
+*.fst
+*.wlf
+*.log
+
+# Simulator work directories
+xsim.dir/
+.Xil/
+work/
+transcript
+vsim.wlf
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+*.swp

@@ -1,0 +1,59 @@
+[*] AXI4-Lite register simulation
+[dumpfile] "C:/FPGA_Practice/zynq_lesson01/wave.vcd"
+[savefile] "C:/FPGA_Practice/zynq_lesson01/axi_lite.gtkw"
+[timestart] 0
+[size] 1500 1000
+*-9.000000 0 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 220
+[signals_width] 240
+[sst_expanded] 0
+@200
+-Clock / Reset (active low)
+@28
+tb_axi_lite_regs.clk
+tb_axi_lite_regs.rstn
+@200
+-AW - Write Address
+@22
+tb_axi_lite_regs.awaddr[7:0]
+@28
+tb_axi_lite_regs.awvalid
+tb_axi_lite_regs.awready
+@200
+-W - Write Data
+@22
+tb_axi_lite_regs.wdata[31:0]
+@28
+tb_axi_lite_regs.wstrb[3:0]
+tb_axi_lite_regs.wvalid
+tb_axi_lite_regs.wready
+@200
+-B - Write Response (00 = OKAY)
+@28
+tb_axi_lite_regs.bvalid
+tb_axi_lite_regs.bready
+tb_axi_lite_regs.bresp[1:0]
+@200
+-AR - Read Address
+@22
+tb_axi_lite_regs.araddr[7:0]
+@28
+tb_axi_lite_regs.arvalid
+tb_axi_lite_regs.arready
+@200
+-R - Read Data / Response (00 = OKAY)
+@22
+tb_axi_lite_regs.rdata[31:0]
+@28
+tb_axi_lite_regs.rvalid
+tb_axi_lite_regs.rready
+tb_axi_lite_regs.rresp[1:0]
+@200
+-Internal Registers
+@22
+tb_axi_lite_regs.dut.control_reg[31:0]
+tb_axi_lite_regs.dut.data_reg[31:0]
+@28
+tb_axi_lite_regs.dut.aw_pending
+tb_axi_lite_regs.dut.w_pending
+
