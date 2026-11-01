@@ -1,5 +1,9 @@
 # zynq_fpga_soc_practice
 
+> **聲明：** 本專案內容由 AI 產生，僅供個人學習與參考。內容可能存在錯誤或疏漏，歡迎指正與交流。
+>
+> **Disclaimer:** The content in this project is AI-generated and intended solely for personal learning and reference. It may contain errors or omissions. Corrections and feedback are welcome.
+
 Zynq / FPGA / SoC 練習專案。
 
 ## Lessons

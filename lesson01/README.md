@@ -1,5 +1,9 @@
 # Lesson 01 — AXI4-Lite Register Slave (simulation only)
 
+> **聲明：** 本專案內容由 AI 產生，僅供個人學習與參考。內容可能存在錯誤或疏漏，歡迎指正與交流。
+>
+> **Disclaimer:** The content in this project is AI-generated and intended solely for personal learning and reference. It may contain errors or omissions. Corrections and feedback are welcome.
+
 ## Scope
 Pure Verilog-2005 AXI4-Lite slave and directed testbench. This is **not** a Zynq PS simulation and does not require a board.
 
