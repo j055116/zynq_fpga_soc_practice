@@ -6,14 +6,18 @@
 
 Zynq / FPGA / SoC 練習專案。
 
+A practice repository for Zynq, FPGA, and SoC development.
+
 ## Lessons
 
 - [Lesson 01 — AXI4-Lite Register Slave](lesson01/README.md)
-- [Lesson 01 互動動畫](lesson01/waveform_explorer.html)
+- [Lesson 01 互動動畫 / Interactive Waveform Explorer](lesson01/waveform_explorer.html)
 
-## 執行 Lesson 01
+## 執行 Lesson 01 / Run Lesson 01
 
 在儲存庫根目錄開啟 PowerShell：
+
+Open PowerShell in the repository root:
 
 ```powershell
 cd lesson01
@@ -23,4 +27,8 @@ vvp sim.vvp
 
 只有編譯成功後才執行模擬。波形與模擬執行檔由本機產生，不納入版本控制。
 
+Run the simulation only after compilation succeeds. Waveforms and simulation executables are generated locally and are excluded from version control.
+
 `.agents/skills/` 放置儲存庫共用的 Codex skills。
+
+`.agents/skills/` contains shared Codex skills for this repository.

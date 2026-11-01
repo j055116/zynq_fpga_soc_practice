@@ -34,7 +34,7 @@ xsim tb_sim -runall
 The testbench creates `wave.vcd` where the simulator runs. Use `xsim tb_sim -gui` for waveform inspection if desired.
 
 ## Architecture guide and waveform animation
-Architecture guides: [English](./axi_lite_regs_ARCHITECTURE.md) | [繁體中文](./axi_lite_regs_ARCHITECTURE_zh-TW.md). Both document the RTL block inventory, signal paths, reset/handshake behavior, and review notes.
+Architecture guides: [English](./axi_lite_regs_ARCHITECTURE.md) | [繁體中文 / Traditional Chinese](./axi_lite_regs_ARCHITECTURE_zh-TW.md). Both document the RTL block inventory, signal paths, reset/handshake behavior, and review notes.
 
 Open [waveform_explorer.html](./waveform_explorer.html) in a browser and select `wave.vcd`. The offline player supports play/pause, previous/next rising `ACLK` edge, edge or timestamp seeking, playback speed, signal snapshots, functional-group context, and links to source anchors. The supplied VCD uses a 1 ps timescale; the selected reference edge is `tb_axi_lite_regs.dut.ACLK` rising. The viewer reports timestamp snapshots and does not infer process execution from value changes.
 
